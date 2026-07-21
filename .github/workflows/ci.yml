@@ -40,6 +40,45 @@ jobs:
       - name: Smoke test
         run: sh tools/smoke.sh ./krudds7
 
+  # Build the linkable static libs (the release products of issue #11) so they
+  # can't rot: a change that breaks the native or wasm archive fails here, on
+  # the PR, instead of at release time. Mirrors the release job's build-lib.sh
+  # invocations, then link-tests the native archive to prove it's usable, not
+  # just that it archives.
+  libs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install a C compiler
+        run: sudo apt-get update && sudo apt-get install -y clang curl
+
+      - name: Install Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+
+      - name: Build native + wasm static libs
+        run: |
+          ./tools/build-lib.sh native dist
+          ./tools/build-lib.sh wasm dist
+          ( cd dist && sha256sum -c \
+              libs7-linux-x86_64.a.sha256 \
+              libs7-wasm32.a.sha256 \
+              s7.h.sha256 )
+
+      - name: Link-test the native lib
+        run: |
+          cat > probe.c <<'EOF'
+          #include "s7.h"
+          #include <stdio.h>
+          int main(void) {
+            s7_scheme *s7 = s7_init();
+            printf("%s\n", s7_object_to_c_string(s7, s7_eval_c_string(s7, "(+ 40 2)")));
+            return 0;
+          }
+          EOF
+          cc -O2 -Idist probe.c dist/libs7-linux-x86_64.a -lm -o probe
+          test "$(./probe)" = 42
+
   # Build + run the smoke test under AddressSanitizer + UBSan + LeakSanitizer.
   # This gate polices OUR code (src/krudds7.c, and future tests) for leaks,
   # out-of-bounds accesses, and undefined behaviour. The vendored interpreter

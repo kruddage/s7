@@ -84,9 +84,10 @@ full story — the fetch mechanism, the patch, and re-vendoring — is in
 | Workflow · job | What it does |
 |---|---|
 | **ci · build** | Builds `krudds7` and runs the behavioural smoke test (`tools/smoke.sh`) |
+| **ci · libs** | Builds the linkable `libs7` static libs (native + wasm) and link-tests the native archive, so the release products can't rot |
 | **ci · sanitizers** | Rebuilds under ASan + UBSan + LeakSanitizer and re-runs the smoke test; fails on any leak, out-of-bounds, or UB |
 | **pr-title** | Checks the PR title is a valid Conventional Commit (it becomes the squashed commit) |
-| **release-please** | On push to `main`, maintains the release PR; on release, builds the `krudds7` binary and attaches it to the GitHub Release |
+| **release-please** | On push to `main`, maintains the release PR; on release, builds the `krudds7` binary **and the `libs7` static libs** and attaches them to the GitHub Release |
 
 ## Versioning and releases
 
@@ -100,10 +101,28 @@ PR's title *is* its commit message and the **pr-title** check enforces the forma
 On each push to `main`, release-please opens or updates a single **release PR** that rolls up
 the unreleased commits: it bumps [`version.txt`](version.txt), regenerates `CHANGELOG.md`, and
 updates `.release-please-manifest.json`. Merging that PR tags `vX.Y.Z`, cuts a GitHub Release,
-and — in the same workflow run — builds `krudds7` and uploads it as a
-`krudds7-linux-x86_64` release asset (with a `.sha256`). CI reads `version.txt` and stamps it
-into the build (`KRUDDS7_VERSION`); PR builds append a `-pr<N>+<sha>` suffix so they never
-collide with a real release.
+and — in the same workflow run — builds and uploads the release assets (each with a matching
+`.sha256`). CI reads `version.txt` and stamps it into the `krudds7` build (`KRUDDS7_VERSION`);
+PR builds append a `-pr<N>+<sha>` suffix so they never collide with a real release.
+
+### Release assets
+
+| Asset | What it is |
+|---|---|
+| `krudds7-linux-x86_64` | The standalone `krudds7` CLI binary (REPL / script runner / `-p`/`-e` evaluator) |
+| `libs7-linux-x86_64.a` | s7 as a **native static library**, for linking the interpreter in-process |
+| `libs7-wasm32.a` | s7 as a **wasm32 static library** (built with `emcc`/`emar`), for linking into a wasm build |
+| `s7.h` | The header the two `libs7` archives expose — one shared copy (target-independent) |
+
+The two `libs7-*.a` archives are the same vendored `third_party/s7.c` compiled with the same
+feature defines as the CLI (`-DWITH_C_LOADER=0 -DWITH_MAIN=0`), just archived per target
+instead of linked into `krudds7`. They exist so a consumer — notably
+[`kruddage/engine`](https://github.com/kruddage/engine), which embeds s7 in-process in both
+its native and wasm builds — can link a release asset instead of vendoring and compiling
+`s7.c` itself. The `KRUDD-LOCAL PATCH` carried in `third_party/s7.c` (see
+[`third_party/VENDOR.md`](third_party/VENDOR.md)) is baked into both archives, which is what
+makes the wasm one safe to link. [`tools/build-lib.sh`](tools/build-lib.sh) produces these and
+runs on every PR (the **ci · libs** job) so a broken archive fails before release, not at it.
 
 > **Setup — `RELEASE_PLEASE_TOKEN`:** the release PR needs a bot token so its
 > checks run. GitHub never re-triggers workflows on `GITHUB_TOKEN`-authored
