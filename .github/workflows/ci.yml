@@ -41,11 +41,13 @@ jobs:
         run: sh tools/smoke.sh ./krudds7
 
   # Build + run the smoke test under AddressSanitizer + UBSan + LeakSanitizer.
-  # This is the memory-safety / undefined-behaviour gate: any leak, out-of-bounds
-  # access, or UB reachable through the interpreter's C surface fails the job.
+  # This gate polices OUR code (src/krudds7.c, and future tests) for leaks,
+  # out-of-bounds accesses, and undefined behaviour. The vendored interpreter
+  # (third_party/s7.c) is compiled WITHOUT instrumentation on purpose: it is
+  # upstream code we don't own, and we don't want the gate to fail on s7's own
+  # deliberate tricks (e.g. its x86 unaligned reads). As krudds7 grows its own C
+  # surface, that surface stays fully covered here.
   # gcc is used because its libasan/libubsan runtimes ship with the runner image.
-  # s7 is upstream code compiled with -w, but the sanitizers still watch it at
-  # run time, so this also catches regressions a pin bump might introduce.
   sanitizers:
     runs-on: ubuntu-latest
     steps:
@@ -57,25 +59,36 @@ jobs:
       - name: Build under ASan + UBSan + LeakSanitizer
         env:
           CC: gcc
-          # -w keeps upstream s7's own warnings quiet; the sanitizer flags ride
-          # in via CFLAGS-equivalent by rebuilding directly here rather than
-          # through krudds7.sh, so the instrumentation covers s7.c and krudds7.c
-          # both.
           ASAN_OPTIONS: detect_leaks=1:halt_on_error=1:abort_on_error=1
           UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
         run: |
-          # Verify (or fetch) the pinned s7 sources, same as krudds7.sh does,
-          # then compile with the sanitizer flags so instrumentation covers both
-          # s7.c and krudds7.c.
+          # Verify (or fetch) the pinned s7 sources, same as krudds7.sh does.
           root="$PWD"
           . ./third_party/sync.sh
+
+          # Instrument our own code with the sanitizers.
           gcc -O1 -g -w -fno-omit-frame-pointer \
             -fsanitize=address,undefined -fno-sanitize-recover=undefined \
             -DWITH_C_LOADER=0 -DWITH_MAIN=0 -DKRUDDS7_VERSION='"ci-san"' \
-            -Ithird_party -o krudds7 src/krudds7.c third_party/s7.c -lm
+            -Ithird_party -c src/krudds7.c -o krudds7.o
+
+          # Compile the vendored interpreter plain: no -fsanitize, so ASan/UBSan
+          # do not police s7's internals. (LeakSanitizer still sees s7's heap
+          # allocations because it intercepts malloc/calloc at link time; its
+          # intentional permanent allocations are whitelisted via the LSan
+          # suppressions file used in the smoke step below.)
+          gcc -O1 -g -w -fno-omit-frame-pointer \
+            -DWITH_C_LOADER=0 -DWITH_MAIN=0 \
+            -Ithird_party -c third_party/s7.c -o s7.o
+
+          # Link with the sanitizer runtime so krudds7.o stays instrumented.
+          gcc -fsanitize=address,undefined krudds7.o s7.o -o krudds7 -lm
 
       - name: Smoke test under sanitizers
         env:
           ASAN_OPTIONS: detect_leaks=1:halt_on_error=1:abort_on_error=1
           UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+          # s7 makes permanent, never-freed allocations during init; whitelist
+          # them so the leak gate polices our code, not s7's by-design internals.
+          LSAN_OPTIONS: suppressions=tools/lsan.supp
         run: sh tools/smoke.sh ./krudds7
