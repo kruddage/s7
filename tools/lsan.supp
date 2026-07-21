@@ -1,0 +1,13 @@
+# LeakSanitizer suppressions for the CI `sanitizers` gate.
+#
+# third_party/s7.c is vendored upstream code we don't own. During s7_init it
+# makes permanent, never-freed allocations on purpose: make_permanent_string
+# builds T_UNHEAP string cells that live outside s7's garbage collector for the
+# whole process (see make_permanent_string / init_strings in s7.c). These are
+# reported by LeakSanitizer at exit, but they are by design, not a bug we intend
+# to fix in someone else's interpreter.
+#
+# Only s7's own permanent allocator is whitelisted here. Our code (src/krudds7.c
+# and future tests) is still fully leak-checked, and any leak that does not pass
+# through one of these frames still fails the gate.
+leak:make_permanent_string
