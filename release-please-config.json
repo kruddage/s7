@@ -1,0 +1,26 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+
+  "//": "release-please derives the version from Conventional Commit messages. We squash-merge, so the squashed commit message is the PR title, which .github/workflows/pr-title.yml lints as a Conventional Commit. feat: bumps minor, fix:/perf: bump patch, and a ! or BREAKING CHANGE bumps major; chore:/docs:/ci:/etc. do not bump the number but are still recorded in the changelog via changelog-sections below.",
+
+  "packages": {
+    ".": {
+      "release-type": "simple",
+      "package-name": "krudds7",
+      "include-component-in-tag": false,
+      "changelog-path": "CHANGELOG.md",
+      "//changelog-sections": "Only feat/fix/perf trigger a version bump, but we list every commit type here so the CHANGELOG records internal-only changes too.",
+      "changelog-sections": [
+        { "type": "feat", "section": "Features" },
+        { "type": "fix", "section": "Bug Fixes" },
+        { "type": "perf", "section": "Performance" },
+        { "type": "refactor", "section": "Refactoring" },
+        { "type": "build", "section": "Build System" },
+        { "type": "ci", "section": "CI" },
+        { "type": "docs", "section": "Documentation" },
+        { "type": "test", "section": "Tests" },
+        { "type": "chore", "section": "Chores" }
+      ]
+    }
+  }
+}

@@ -1,0 +1,77 @@
+name: release-please
+
+# release-please owns versioning and releases. On every push to main it opens
+# (or updates) a single "release PR" that rolls up the Conventional Commits
+# merged since the last release: it bumps version.txt, regenerates CHANGELOG.md,
+# and updates .release-please-manifest.json. Merging that PR tags vX.Y.Z and
+# cuts a GitHub Release.
+#
+# When that release is cut, the same run also builds the krudds7 binary and
+# attaches it to the release. This is folded into ONE workflow on purpose: a
+# release-please release is created with GITHUB_TOKEN, and Actions does not
+# re-trigger workflows on GITHUB_TOKEN-authored events (no recursion) — so a
+# separate `on: release`/`on: push: tags` job would never fire without a PAT.
+# Gating the build on the action's `release_created` output is the supported way
+# to react to a release from within the run that made it.
+on:
+  push:
+    branches: [main]
+
+# Needed to open the release PR and, on merge, push the tag, create the release,
+# and upload the binary asset. GITHUB_TOKEN is sufficient for all of it.
+permissions:
+  contents: write
+  pull-requests: write
+
+# One release PR at a time; let an in-flight run finish rather than racing.
+concurrency:
+  group: release-please
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      # Pinned to the major; Dependabot (ci: bumps) keeps it current. The "."
+      # (root) package exposes top-level `release_created` / `tag_name` outputs,
+      # which the build steps below key off.
+      - id: release
+        uses: googleapis/release-please-action@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+      # --- Below here only runs on the push to main that MERGED the release PR,
+      #     i.e. when a new vX.Y.Z was actually tagged and released. ---
+
+      - name: Check out the tagged tree
+        if: ${{ steps.release.outputs.release_created }}
+        uses: actions/checkout@v4
+
+      - name: Install a C compiler
+        if: ${{ steps.release.outputs.release_created }}
+        run: sudo apt-get update && sudo apt-get install -y clang curl
+
+      # Stamp the exact released version (the tag, e.g. v0.1.0) into the binary,
+      # then stage it under a platform-named filename with a checksum beside it.
+      - name: Build the krudds7 release binary (linux x86_64)
+        if: ${{ steps.release.outputs.release_created }}
+        env:
+          KRUDDS7_VERSION: ${{ steps.release.outputs.tag_name }}
+        run: |
+          ./krudds7.sh build
+          mkdir -p dist
+          cp krudds7 dist/krudds7-linux-x86_64
+          ( cd dist && sha256sum krudds7-linux-x86_64 > krudds7-linux-x86_64.sha256 )
+          ./dist/krudds7-linux-x86_64 --version
+
+      - name: Attach the binary to the release
+        if: ${{ steps.release.outputs.release_created }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ steps.release.outputs.tag_name }}" \
+            dist/krudds7-linux-x86_64 \
+            dist/krudds7-linux-x86_64.sha256 \
+            --clobber

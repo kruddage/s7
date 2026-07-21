@@ -1,0 +1,16 @@
+# Code owners — GitHub requests a review from the owner when a matching path
+# changes. The LAST matching pattern wins for a given file.
+# See https://docs.github.com/articles/about-code-owners.
+
+# Default owner for everything.
+*                       @joshcoyne
+
+# Version + release machinery — maintained by release-please, but guard it so a
+# manual edit still routes a review. version.txt is what CI stamps into the
+# binary; the manifest and config drive release-please itself.
+/version.txt                    @joshcoyne
+/.release-please-manifest.json  @joshcoyne
+/release-please-config.json     @joshcoyne
+
+# The vendored s7 pin: a bump changes the interpreter every build compiles.
+/third_party/           @joshcoyne

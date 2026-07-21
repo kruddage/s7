@@ -1,0 +1,9 @@
+# Build output
+/krudds7
+*.o
+
+# Release staging (built binaries + tarballs the release workflow assembles)
+/dist/
+
+# agent worktrees (isolated subagent checkouts)
+.claude/worktrees/

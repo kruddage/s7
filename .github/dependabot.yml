@@ -1,0 +1,12 @@
+# Dependabot keeps our GitHub Actions current so pins don't rot.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    # prefix "ci" makes Dependabot's squash title a Conventional Commit
+    # (ci: ...), which release-please records in the changelog without bumping
+    # the version.
+    commit-message:
+      prefix: "ci"

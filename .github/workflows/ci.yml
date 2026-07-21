@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  # Build krudds7 and run a small behavioural smoke test. This is the gate that
+  # keeps the interpreter compiling and the front door (REPL / -e / -p / script
+  # runner) behaving as the tree moves.
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install a C compiler
+        run: sudo apt-get update && sudo apt-get install -y clang gcc curl
+
+      # The released version is the single line in version.txt, maintained by
+      # release-please. A push/main build stamps that verbatim; a PR build
+      # appends -pr<N>+<sha> so a preview binary can never be mistaken for a
+      # real release. Kept POSIX (printf '%.7s') so it runs under any /bin/sh.
+      - name: Determine version
+        id: version
+        run: |
+          base=$(tr -d ' \t\n\r' < version.txt)
+          if [ "${{ github.event_name }}" = pull_request ]; then
+            short=$(printf '%.7s' "${{ github.event.pull_request.head.sha }}")
+            echo "version=${base}-pr${{ github.event.pull_request.number }}+${short}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=${base}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build
+        env:
+          KRUDDS7_VERSION: ${{ steps.version.outputs.version }}
+        run: ./krudds7.sh build
+
+      - name: Smoke test
+        run: sh tools/smoke.sh ./krudds7
+
+  # Build + run the smoke test under AddressSanitizer + UBSan + LeakSanitizer.
+  # This is the memory-safety / undefined-behaviour gate: any leak, out-of-bounds
+  # access, or UB reachable through the interpreter's C surface fails the job.
+  # gcc is used because its libasan/libubsan runtimes ship with the runner image.
+  # s7 is upstream code compiled with -w, but the sanitizers still watch it at
+  # run time, so this also catches regressions a pin bump might introduce.
+  sanitizers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain
+        run: sudo apt-get update && sudo apt-get install -y gcc curl
+
+      - name: Build under ASan + UBSan + LeakSanitizer
+        env:
+          CC: gcc
+          # -w keeps upstream s7's own warnings quiet; the sanitizer flags ride
+          # in via CFLAGS-equivalent by rebuilding directly here rather than
+          # through krudds7.sh, so the instrumentation covers s7.c and krudds7.c
+          # both.
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1:abort_on_error=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+        run: |
+          # Verify (or fetch) the pinned s7 sources, same as krudds7.sh does,
+          # then compile with the sanitizer flags so instrumentation covers both
+          # s7.c and krudds7.c.
+          root="$PWD"
+          . ./third_party/sync.sh
+          gcc -O1 -g -w -fno-omit-frame-pointer \
+            -fsanitize=address,undefined -fno-sanitize-recover=undefined \
+            -DWITH_C_LOADER=0 -DWITH_MAIN=0 -DKRUDDS7_VERSION='"ci-san"' \
+            -Ithird_party -o krudds7 src/krudds7.c third_party/s7.c -lm
+
+      - name: Smoke test under sanitizers
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1:abort_on_error=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+        run: sh tools/smoke.sh ./krudds7
