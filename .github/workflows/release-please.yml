@@ -47,7 +47,7 @@ jobs:
 
       - name: Check out the tagged tree
         if: ${{ steps.release.outputs.release_created }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install a C compiler
         if: ${{ steps.release.outputs.release_created }}
