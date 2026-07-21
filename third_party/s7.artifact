@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: 0BSD
+#
+# Pin for s7.c / s7.h, sourced by third_party/sync.sh. This is the one place
+# the s7 pin lives — see VENDOR.md for the fetch mechanism and license
+# rationale.
+#
+# Re-vendoring: bump S7_VERSION/S7_DATE/S7_COMMIT to the new upstream commit,
+# update S7_C_SHA256/S7_H_SHA256, then delete the committed s7.c/s7.h and
+# re-run sync.sh (or krudds7.sh) — it downloads the new pin, fails loudly if
+# these checksums weren't updated to match, and the result should be
+# committed back to the repo.
+#
+# WARNING: s7.c carries a LOCAL PATCH inherited verbatim from kruddage/engine
+# (search KRUDD-LOCAL PATCH in it; rationale in VENDOR.md "Local patch"), so
+# S7_C_SHA256 below is the checksum of the PATCHED file, NOT of the upstream
+# download. The patch only matters on a wasm target and is inert in the native
+# krudds7 binary, but the bytes are kept identical to engine's pin so the two
+# repos vendor the exact same s7. Re-vendoring must decide whether to keep or
+# drop the patch and recompute the checksum from whatever file ends up
+# committed — see VENDOR.md.
+
+S7_VERSION="10.8"
+S7_DATE="17-Apr-2024"
+S7_COMMIT="85bf12688518a5b4f40ef6f4b45338f770abc03c"
+
+S7_C_URL="https://raw.githubusercontent.com/aboalang/s7/$S7_COMMIT/s7.c"
+S7_H_URL="https://raw.githubusercontent.com/aboalang/s7/$S7_COMMIT/s7.h"
+
+S7_C_SHA256="2a7f4438a2f82d3d2e05f9dd55ad345034fcb53ae2a34eaa287e75868e04f531"
+S7_H_SHA256="4054fd2b3dfd2416a87312e8ae78f5dbb4ec9c02031b10030634d555b27bc826"

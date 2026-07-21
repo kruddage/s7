@@ -1,0 +1,42 @@
+name: pr-title
+
+# We squash-merge, so a PR's squashed commit message is its title. release-please
+# parses that commit as a Conventional Commit to decide the version bump and the
+# changelog entry, so the title MUST be a valid Conventional Commit.
+#
+# Examples:  feat: add a -p print-eval flag        (minor bump)
+#            fix: survive EOF mid-form in the REPL  (patch bump)
+#            feat!: rename the -e flag              (major bump)
+#            chore: bump the s7 pin                 (no bump, still in changelog)
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  pull-requests: read
+
+jobs:
+  lint-title:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: amannn/action-semantic-pull-request@v6
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # Keep this list in sync with changelog-sections in
+          # release-please-config.json.
+          types: |
+            feat
+            fix
+            perf
+            refactor
+            build
+            ci
+            docs
+            test
+            chore
+          requireScope: false
+          # Enforce lowercase subject start, matching Conventional Commits.
+          subjectPattern: ^(?![A-Z]).+$
+          subjectPatternError: |
+            The subject "{subject}" should start lowercase (Conventional Commits).
