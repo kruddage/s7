@@ -75,6 +75,12 @@ jobs:
         if: ${{ steps.release.outputs.release_created }}
         run: sudo apt-get update && sudo apt-get install -y clang curl
 
+      # Emscripten for the wasm32 static lib. Native tooling above covers the
+      # CLI and the native lib; this adds emcc/emar for the wasm build below.
+      - name: Install Emscripten
+        if: ${{ steps.release.outputs.release_created }}
+        uses: mymindstorm/setup-emsdk@v14
+
       # Stamp the exact released version (the tag, e.g. v0.1.0) into the binary,
       # then stage it under a platform-named filename with a checksum beside it.
       - name: Build the krudds7 release binary (linux x86_64)
@@ -88,7 +94,21 @@ jobs:
           ( cd dist && sha256sum krudds7-linux-x86_64 > krudds7-linux-x86_64.sha256 )
           ./dist/krudds7-linux-x86_64 --version
 
-      - name: Attach the binary to the release
+      # The linkable products: the same vendored s7.c archived per target so a
+      # consumer (kruddage/engine) can drop its own third_party/s7.c and link a
+      # release asset instead. Both stage an identical s7.h; build-lib.sh writes
+      # it once into dist/ each time (same bytes), leaving one shared header.
+      - name: Build the s7 static libs (native + wasm)
+        if: ${{ steps.release.outputs.release_created }}
+        run: |
+          ./tools/build-lib.sh native dist
+          ./tools/build-lib.sh wasm dist
+          ( cd dist && sha256sum -c \
+              libs7-linux-x86_64.a.sha256 \
+              libs7-wasm32.a.sha256 \
+              s7.h.sha256 )
+
+      - name: Attach the binary and libs to the release
         if: ${{ steps.release.outputs.release_created }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -96,4 +116,10 @@ jobs:
           gh release upload "${{ steps.release.outputs.tag_name }}" \
             dist/krudds7-linux-x86_64 \
             dist/krudds7-linux-x86_64.sha256 \
+            dist/libs7-linux-x86_64.a \
+            dist/libs7-linux-x86_64.a.sha256 \
+            dist/libs7-wasm32.a \
+            dist/libs7-wasm32.a.sha256 \
+            dist/s7.h \
+            dist/s7.h.sha256 \
             --clobber
