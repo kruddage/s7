@@ -21,8 +21,10 @@ on:
   # on demand without having to push a commit.
   workflow_dispatch:
 
-# Needed to open the release PR and, on merge, push the tag, create the release,
-# and upload the binary asset. GITHUB_TOKEN is sufficient for all of it.
+# Permissions for the workflow's own GITHUB_TOKEN: open the release PR and, on
+# merge, push the tag, create the release, and upload the binary asset. These
+# still apply to the fallback path; when RELEASE_PLEASE_TOKEN is set, that token
+# carries its own permissions (see the release step below).
 permissions:
   contents: write
   pull-requests: write
@@ -42,7 +44,18 @@ jobs:
       - id: release
         uses: googleapis/release-please-action@v5
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          # Prefer a bot token (a fine-grained PAT or a GitHub App token) stored
+          # as the RELEASE_PLEASE_TOKEN secret, and fall back to GITHUB_TOKEN when
+          # it is not set (an unset secret is empty, so `||` selects GITHUB_TOKEN).
+          #
+          # This is what lets the release PR receive CI. Actions never re-triggers
+          # workflows on GITHUB_TOKEN-authored events (the no-recursion rule), so a
+          # release PR opened/updated with GITHUB_TOKEN never runs ci.yml and gets
+          # stuck forever on its required status checks. A separate token is a
+          # distinct identity, so its push DOES trigger ci.yml and the release PR
+          # becomes mergeable the normal way. The token needs contents:write and
+          # pull-requests:write on this repo.
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
           # Pin the release branch explicitly. Without this, release-please
