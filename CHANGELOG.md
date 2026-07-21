@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.0](https://github.com/kruddage/s7/compare/v0.2.0...v0.3.0) (2026-07-21)
+
+
+### Features
+
+* publish prebuilt s7 static libs (native + wasm) as release assets ([#12](https://github.com/kruddage/s7/issues/12)) ([d6e2a43](https://github.com/kruddage/s7/commit/d6e2a4387cdd58a6884c86dc2109f86e17ddd0d9))
+
+
+### CI
+
+* let release PRs run CI via a bot token ([#9](https://github.com/kruddage/s7/issues/9)) ([9228d6c](https://github.com/kruddage/s7/commit/9228d6c85078ecdf57acd2b58e77fce12a35f2f8))
+
 ## [0.2.0](https://github.com/kruddage/s7/compare/v0.1.0...v0.2.0) (2026-07-21)
 
 
