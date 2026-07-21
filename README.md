@@ -105,6 +105,14 @@ and — in the same workflow run — builds `krudds7` and uploads it as a
 into the build (`KRUDDS7_VERSION`); PR builds append a `-pr<N>+<sha>` suffix so they never
 collide with a real release.
 
+> **Setup — `RELEASE_PLEASE_TOKEN`:** the release PR needs a bot token so its
+> checks run. GitHub never re-triggers workflows on `GITHUB_TOKEN`-authored
+> pushes, so a release PR opened with the default token never runs `ci.yml` and
+> stays blocked on its required checks. Add a repo (or org) secret named
+> `RELEASE_PLEASE_TOKEN` — a fine-grained PAT or GitHub App token with
+> **contents: write** and **pull requests: write** on this repo — and
+> release-please will use it (falling back to `GITHUB_TOKEN` when it's unset).
+
 ## License
 
 krudds7's own files (the front door, build script, CI, and docs) are **0BSD** — the
