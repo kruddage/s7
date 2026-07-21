@@ -16,6 +16,10 @@ name: release-please
 on:
   push:
     branches: [main]
+  # Allow a manual run from the Actions tab. release-please is normally driven by
+  # pushes to main, but this makes it possible to re-open/refresh the release PR
+  # on demand without having to push a commit.
+  workflow_dispatch:
 
 # Needed to open the release PR and, on merge, push the tag, create the release,
 # and upload the binary asset. GITHUB_TOKEN is sufficient for all of it.
@@ -41,6 +45,11 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+          # Pin the release branch explicitly. Without this, release-please
+          # targets whatever the repo's default branch happens to be when the
+          # run fires; a default-branch change once caused it to open the release
+          # PR against a stale feature branch instead of main.
+          target-branch: main
 
       # --- Below here only runs on the push to main that MERGED the release PR,
       #     i.e. when a new vX.Y.Z was actually tagged and released. ---
