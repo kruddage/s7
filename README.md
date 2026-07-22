@@ -121,8 +121,14 @@ PR builds append a `-pr<N>+<sha>` suffix so they never collide with a real relea
 The Windows assets are built on a `windows-latest` runner with **MinGW-w64** (MSYS2's `MINGW64`
 environment), not cross-compiled from Linux — CI runs [`tools/smoke.sh`](tools/smoke.sh) against
 the real `krudds7.exe`, so Windows-specific runtime behaviour is actually exercised rather than
-merely compiled. The binary is native: CI asserts it does not link `msys-2.0.dll`, so it runs on
-a machine with no MSYS2 installed.
+merely compiled.
+
+The binary is linked with `-static`, so it depends on nothing but `KERNEL32.dll` and `msvcrt.dll`
+— both part of Windows — and runs on a machine with no MSYS2 or MinGW installed. CI asserts this
+by checking that no import resolves inside the toolchain prefix. That check matters more than it
+looks: every CI step runs *inside* MSYS2 with `/mingw64/bin` on `PATH`, so a dynamically linked
+binary passes the entire smoke suite on the runner and then fails at load with
+`STATUS_DLL_NOT_FOUND` on a real machine. v0.4.0 shipped exactly that bug.
 
 MinGW rather than MSVC is deliberate. s7 and `krudds7.c` build unmodified under GCC, the archive
 stays a normal `.a`, and the POSIX shell scripts that drive this repo keep working — the same
