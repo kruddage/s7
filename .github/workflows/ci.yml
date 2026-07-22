@@ -122,21 +122,42 @@ jobs:
           KRUDDS7_VERSION: ${{ steps.version.outputs.version }}
         run: ./krudds7.sh build
 
-      # The binary must be genuinely native. If MINGW64 were misconfigured and we
-      # built an MSYS binary instead, it would still pass the smoke test on this
-      # runner but fail on any machine without msys-2.0.dll — so assert it here
-      # rather than discovering it after a release.
-      - name: Assert no msys runtime dependency
+      # The binary must run on a machine with no MSYS2 or MinGW installed. Every
+      # step in this job executes inside MSYS2, where /mingw64/bin is on PATH, so
+      # a binary importing libwinpthread-1.dll passes the whole smoke suite here
+      # and then dies at load with STATUS_DLL_NOT_FOUND on a clean Windows box.
+      # v0.4.0 shipped exactly that.
+      #
+      # Checking for msys-2.0.dll alone is NOT sufficient — that only catches an
+      # MSYS-flavoured build, and the MinGW runtime DLLs are a separate problem.
+      # Assert instead that nothing the binary imports resolves inside the
+      # toolchain prefix, which covers both.
+      - name: Assert the binary is self-contained
         run: |
-          if ldd ./krudds7.exe | grep -qi 'msys-2.0.dll'; then
-            echo "krudds7.exe links msys-2.0.dll — not a portable native binary" >&2
-            ldd ./krudds7.exe
+          ldd ./krudds7.exe
+          if ldd ./krudds7.exe | grep -iE '=> */(mingw64|msys|usr)/'; then
+            echo "" >&2
+            echo "krudds7.exe imports DLLs from the MSYS2/MinGW prefix, listed above." >&2
+            echo "Those are absent on a clean Windows machine; the binary would fail" >&2
+            echo "to start with STATUS_DLL_NOT_FOUND. Link it with -static." >&2
             exit 1
           fi
-          echo "ok - native binary, no msys runtime"
+          echo "ok - self-contained: only system DLLs imported"
 
       - name: Smoke test
         run: sh tools/smoke.sh ./krudds7.exe
+
+      # Publish the binary so it can be pulled with `gh run download` and run on
+      # a real Windows machine, outside MSYS2. Nothing inside this job can prove
+      # the binary even starts there: v0.4.0 passed every check above and still
+      # died at load on a clean box. This makes the artifact testable before a
+      # release rather than after one.
+      - name: Upload krudds7.exe for out-of-environment testing
+        uses: actions/upload-artifact@v4
+        with:
+          name: krudds7-windows-x86_64
+          path: krudds7.exe
+          retention-days: 14
 
       - name: Build the Windows static lib
         run: |

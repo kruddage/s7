@@ -53,6 +53,19 @@ if [ -z "${KRUDDS7_EXE_SUFFIX+set}" ]; then
 	esac
 fi
 
+# A Windows binary has to run on a machine with no MSYS2 or MinGW installed.
+# MinGW-w64's gcc links its own runtime dynamically by default, so the .exe ends
+# up importing libwinpthread-1.dll (and, depending on the build, libgcc_s_seh-1.dll)
+# from /mingw64/bin. Those are absent everywhere except a dev machine, and the
+# binary then dies at load with STATUS_DLL_NOT_FOUND (0xC0000135) before main()
+# runs — so nothing in a smoke test that executes inside MSYS2 can catch it.
+# -static links the toolchain runtime in. msvcrt.dll and KERNEL32.dll remain
+# dynamic imports, which is correct: those ship with Windows itself.
+ldextra=
+if [ -n "$exe" ]; then
+	ldextra=-static
+fi
+
 bin="$root/krudds7$exe"
 src="$root/src/krudds7.c"
 s7="$root/third_party/s7.c"
@@ -63,7 +76,7 @@ if [ ! -x "$bin" ] || [ "$src" -nt "$bin" ] || [ "$s7" -nt "$bin" ]; then
 	"$cc" -O2 -w -DWITH_C_LOADER=0 -DWITH_MAIN=0 \
 		-DKRUDDS7_VERSION="\"$version\"" \
 		-I"$root/third_party" \
-		-o "$bin" "$src" "$s7" -lm
+		-o "$bin" "$src" "$s7" $ldextra -lm
 fi
 
 # `build` just builds; anything else is handed to the binary. `--` lets a caller
