@@ -14,7 +14,17 @@
 #   ./tools/build-lib.sh wasm   <outdir>    # emcc / emar -> libs7-wasm32.a
 #
 # The compiler/archiver default per target but honour CC/AR overrides. The
-# archive name is fixed per target so release assets stay stable.
+# archive name defaults per target so existing release assets stay stable;
+# S7_LIB_TRIPLE overrides just the platform tag, for building an archive for a
+# target other than the host:
+#
+#   S7_LIB_TRIPLE=windows-x86_64 CC=x86_64-w64-mingw32-gcc \
+#       AR=x86_64-w64-mingw32-ar ./tools/build-lib.sh native dist
+#
+# writes libs7-windows-x86_64.a instead. Nothing derives the tag from the host:
+# the compiler decides what is actually produced, so guessing from uname would
+# just mislabel a cross build. Unset, every existing caller (ci.yml,
+# release-please.yml) produces byte-identical asset names.
 set -e
 
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
@@ -26,18 +36,20 @@ case "$target" in
 native)
 	cc=${CC:-cc}
 	ar=${AR:-ar}
-	lib=libs7-linux-x86_64.a
+	triple=${S7_LIB_TRIPLE:-linux-x86_64}
 	;;
 wasm)
 	cc=${CC:-emcc}
 	ar=${AR:-emar}
-	lib=libs7-wasm32.a
+	triple=${S7_LIB_TRIPLE:-wasm32}
 	;;
 *)
 	echo "build-lib.sh: unknown target '$target' (want: native | wasm)" >&2
 	exit 1
 	;;
 esac
+
+lib=libs7-$triple.a
 
 # Verify (or fetch) the pinned s7 amalgamation, exactly as krudds7.sh does, so
 # the lib is built from the same checksummed bytes as the CLI.
