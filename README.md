@@ -110,11 +110,34 @@ PR builds append a `-pr<N>+<sha>` suffix so they never collide with a real relea
 | Asset | What it is |
 |---|---|
 | `krudds7-linux-x86_64` | The standalone `krudds7` CLI binary (REPL / script runner / `-p`/`-e` evaluator) |
+| `krudds7-windows-x86_64.exe` | The same CLI, built natively for Windows with MinGW-w64 |
 | `libs7-linux-x86_64.a` | s7 as a **native static library**, for linking the interpreter in-process |
+| `libs7-windows-x86_64.a` | s7 as a **Windows static library** (MinGW-w64), for linking on Windows |
 | `libs7-wasm32.a` | s7 as a **wasm32 static library** (built with `emcc`/`emar`), for linking into a wasm build |
-| `s7.h` | The header the two `libs7` archives expose — one shared copy (target-independent) |
+| `s7.h` | The header every `libs7` archive exposes — one shared copy (target-independent) |
 
-The two `libs7-*.a` archives are the same vendored `third_party/s7.c` compiled with the same
+### Windows
+
+The Windows assets are built on a `windows-latest` runner with **MinGW-w64** (MSYS2's `MINGW64`
+environment), not cross-compiled from Linux — CI runs [`tools/smoke.sh`](tools/smoke.sh) against
+the real `krudds7.exe`, so Windows-specific runtime behaviour is actually exercised rather than
+merely compiled. The binary is native: CI asserts it does not link `msys-2.0.dll`, so it runs on
+a machine with no MSYS2 installed.
+
+MinGW rather than MSVC is deliberate. s7 and `krudds7.c` build unmodified under GCC, the archive
+stays a normal `.a`, and the POSIX shell scripts that drive this repo keep working — the same
+reasoning that makes a Windows port of [`kruddage/engine`](https://github.com/kruddage/engine)
+(which is `-std=gnu11` throughout) tractable at all.
+
+To build on Windows yourself, from an MSYS2 MINGW64 shell:
+
+```sh
+pacman -S mingw-w64-x86_64-gcc
+./krudds7.sh build                                        # -> krudds7.exe
+S7_LIB_TRIPLE=windows-x86_64 ./tools/build-lib.sh native dist
+```
+
+The `libs7-*.a` archives are the same vendored `third_party/s7.c` compiled with the same
 feature defines as the CLI (`-DWITH_C_LOADER=0 -DWITH_MAIN=0`), just archived per target
 instead of linked into `krudds7`. They exist so a consumer — notably
 [`kruddage/engine`](https://github.com/kruddage/engine), which embeds s7 in-process in both
