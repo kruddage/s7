@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.0](https://github.com/kruddage/s7/compare/v0.3.0...v0.4.0) (2026-07-22)
+
+
+### Features
+
+* **build-lib:** allow overriding the archive platform tag ([#16](https://github.com/kruddage/s7/issues/16)) ([b0b5334](https://github.com/kruddage/s7/commit/b0b5334d4bd6ff96877c9017b5da455db4561bed))
+* publish native Windows build artifacts ([#18](https://github.com/kruddage/s7/issues/18)) ([3d92dc2](https://github.com/kruddage/s7/commit/3d92dc265b84ce2dc99f79cf1b6039f9e1f8c973))
+
 ## [0.3.0](https://github.com/kruddage/s7/compare/v0.2.0...v0.3.0) (2026-07-21)
 
 
