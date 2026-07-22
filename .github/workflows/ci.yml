@@ -79,6 +79,86 @@ jobs:
           cc -O2 -Idist probe.c dist/libs7-linux-x86_64.a -lm -o probe
           test "$(./probe)" = 42
 
+  # Native Windows build, MinGW-w64 via MSYS2. This runs on windows-latest rather
+  # than cross-compiling from ubuntu deliberately: a cross build proves only that
+  # the code compiles and links, and the failures worth catching here are runtime
+  # ones — isatty() on a Windows console, argv path translation when a POSIX path
+  # reaches a native binary, CRT differences in fgets/realloc. Running the real
+  # tools/smoke.sh against the real krudds7.exe is the only thing that sees those.
+  #
+  # MINGW64 (not MSYS) is the target: it produces a native Windows binary with no
+  # msys-2.0.dll runtime dependency, which is what a release asset has to be.
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: false
+          install: >-
+            mingw-w64-x86_64-gcc
+            coreutils
+
+      # Same version scheme as the ubuntu build job, so a Windows preview binary
+      # is labelled identically to its Linux counterpart.
+      - name: Determine version
+        id: version
+        run: |
+          base=$(tr -d ' \t\n\r' < version.txt)
+          if [ "${{ github.event_name }}" = pull_request ]; then
+            short=$(printf '%.7s' "${{ github.event.pull_request.head.sha }}")
+            echo "version=${base}-pr${{ github.event.pull_request.number }}+${short}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=${base}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build the CLI
+        env:
+          KRUDDS7_VERSION: ${{ steps.version.outputs.version }}
+        run: ./krudds7.sh build
+
+      # The binary must be genuinely native. If MINGW64 were misconfigured and we
+      # built an MSYS binary instead, it would still pass the smoke test on this
+      # runner but fail on any machine without msys-2.0.dll — so assert it here
+      # rather than discovering it after a release.
+      - name: Assert no msys runtime dependency
+        run: |
+          if ldd ./krudds7.exe | grep -qi 'msys-2.0.dll'; then
+            echo "krudds7.exe links msys-2.0.dll — not a portable native binary" >&2
+            ldd ./krudds7.exe
+            exit 1
+          fi
+          echo "ok - native binary, no msys runtime"
+
+      - name: Smoke test
+        run: sh tools/smoke.sh ./krudds7.exe
+
+      - name: Build the Windows static lib
+        run: |
+          S7_LIB_TRIPLE=windows-x86_64 ./tools/build-lib.sh native dist
+          ( cd dist && sha256sum -c libs7-windows-x86_64.a.sha256 s7.h.sha256 )
+
+      # Mirrors the linux link-test: prove the archive is usable, not merely that
+      # it archives.
+      - name: Link-test the Windows lib
+        run: |
+          cat > probe.c <<'EOF'
+          #include "s7.h"
+          #include <stdio.h>
+          int main(void) {
+            s7_scheme *s7 = s7_init();
+            printf("%s\n", s7_object_to_c_string(s7, s7_eval_c_string(s7, "(+ 40 2)")));
+            return 0;
+          }
+          EOF
+          gcc -O2 -Idist probe.c dist/libs7-windows-x86_64.a -lm -o probe.exe
+          test "$(./probe.exe)" = 42
+
   # Build + run the smoke test under AddressSanitizer + UBSan + LeakSanitizer.
   # This gate polices OUR code (src/krudds7.c, and future tests) for leaks,
   # out-of-bounds accesses, and undefined behaviour. The vendored interpreter

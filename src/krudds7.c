@@ -14,7 +14,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef _WIN32
+/*
+ * isatty()/fileno() are the only POSIX calls this file makes, and on Windows
+ * they live in <io.h> rather than <unistd.h> (which MinGW does not ship). MinGW
+ * declares both under their unprefixed names, so the single use site in repl()
+ * needs no further conditionals.
+ */
+#include <io.h>
+#else
 #include <unistd.h>
+#endif
 
 #include "s7.h"
 

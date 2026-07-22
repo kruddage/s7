@@ -37,6 +37,11 @@ concurrency:
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    # Re-exported so the windows-assets job below can gate on the same release
+    # and target the same tag. Step outputs are not visible across jobs.
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
       # Pinned to the major; Dependabot (ci: bumps) keeps it current. The "."
       # (root) package exposes top-level `release_created` / `tag_name` outputs,
@@ -122,4 +127,59 @@ jobs:
             dist/libs7-wasm32.a.sha256 \
             dist/s7.h \
             dist/s7.h.sha256 \
+            --clobber
+
+  # The Windows assets, built natively on windows-latest with MinGW-w64 for the
+  # same reasons ci.yml's `windows` job does (see the comment there). A separate
+  # job because the release job above is ubuntu-only; both attach to the release
+  # the release-please step created, so ordering between them does not matter.
+  #
+  # s7.h is not uploaded here — it is target-independent and the linux job
+  # already published one copy. Uploading a second would race for the same asset
+  # name for no gain.
+  windows-assets:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created }}
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: false
+          install: >-
+            mingw-w64-x86_64-gcc
+            coreutils
+
+      - name: Build the krudds7 release binary (windows x86_64)
+        env:
+          KRUDDS7_VERSION: ${{ needs.release-please.outputs.tag_name }}
+        run: |
+          ./krudds7.sh build
+          mkdir -p dist
+          cp krudds7.exe dist/krudds7-windows-x86_64.exe
+          ( cd dist && sha256sum krudds7-windows-x86_64.exe > krudds7-windows-x86_64.exe.sha256 )
+          ./dist/krudds7-windows-x86_64.exe --version
+
+      - name: Build the s7 static lib (windows x86_64)
+        run: |
+          S7_LIB_TRIPLE=windows-x86_64 ./tools/build-lib.sh native dist
+          ( cd dist && sha256sum -c libs7-windows-x86_64.a.sha256 )
+
+      # pwsh, not the msys2 shell: gh ships on the runner image but is not on
+      # MSYS2's PATH.
+      - name: Attach the Windows assets to the release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ needs.release-please.outputs.tag_name }}" `
+            dist/krudds7-windows-x86_64.exe `
+            dist/krudds7-windows-x86_64.exe.sha256 `
+            dist/libs7-windows-x86_64.a `
+            dist/libs7-windows-x86_64.a.sha256 `
             --clobber

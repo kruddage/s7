@@ -41,7 +41,19 @@ if [ -z "$version" ] && [ -f "$root/version.txt" ]; then
 fi
 : "${version:=0.0.0-dev}"
 
-bin="$root/krudds7"
+# Windows toolchains write an .exe whether or not -o asked for one, so the
+# staleness check below has to look for the name the compiler will actually
+# produce — otherwise `[ ! -x "$bin" ]` is always true and every run rebuilds.
+# Detected from the shell rather than the compiler because the check happens
+# before any compile; KRUDDS7_EXE_SUFFIX overrides for cross builds.
+exe=${KRUDDS7_EXE_SUFFIX-}
+if [ -z "${KRUDDS7_EXE_SUFFIX+set}" ]; then
+	case $(uname -s 2>/dev/null || echo unknown) in
+	MINGW*|MSYS*|CYGWIN*) exe=.exe ;;
+	esac
+fi
+
+bin="$root/krudds7$exe"
 src="$root/src/krudds7.c"
 s7="$root/third_party/s7.c"
 if [ ! -x "$bin" ] || [ "$src" -nt "$bin" ] || [ "$s7" -nt "$bin" ]; then
