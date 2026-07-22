@@ -147,6 +147,18 @@ jobs:
       - name: Smoke test
         run: sh tools/smoke.sh ./krudds7.exe
 
+      # Publish the binary so it can be pulled with `gh run download` and run on
+      # a real Windows machine, outside MSYS2. Nothing inside this job can prove
+      # the binary even starts there: v0.4.0 passed every check above and still
+      # died at load on a clean box. This makes the artifact testable before a
+      # release rather than after one.
+      - name: Upload krudds7.exe for out-of-environment testing
+        uses: actions/upload-artifact@v4
+        with:
+          name: krudds7-windows-x86_64
+          path: krudds7.exe
+          retention-days: 14
+
       - name: Build the Windows static lib
         run: |
           S7_LIB_TRIPLE=windows-x86_64 ./tools/build-lib.sh native dist
