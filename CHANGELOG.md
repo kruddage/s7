@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/kruddage/s7/compare/v0.4.0...v0.4.1) (2026-07-22)
+
+
+### Bug Fixes
+
+* link the Windows binary statically so it runs outside MSYS2 ([#19](https://github.com/kruddage/s7/issues/19)) ([28b4998](https://github.com/kruddage/s7/commit/28b4998defa79cdfd09de6aa94c28632174ea244))
+
 ## [0.4.0](https://github.com/kruddage/s7/compare/v0.3.0...v0.4.0) (2026-07-22)
 
 
