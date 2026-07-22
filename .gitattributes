@@ -1,0 +1,16 @@
+# Line endings.
+#
+# This repo is POSIX shell end to end, and third_party/s7.c is verified
+# byte-for-byte against the checksum pinned in third_party/s7.artifact.
+#
+# Git enables core.autocrlf on Windows by default — including on GitHub's
+# windows-latest runners — which rewrites LF to CRLF on checkout. That changes
+# exactly the bytes the checksum describes: sync.sh sees a mismatched s7.c,
+# concludes it is missing or corrupt, re-downloads pristine upstream, and then
+# fails a second time, because the pinned hash is of the PATCHED file rather
+# than of upstream's. The error reads like a bad pin; the cause is the checkout.
+#
+# Forcing LF in the working tree on every platform keeps a checkout byte-identical
+# to what the checksum was taken over, and keeps the shell scripts free of the
+# CRLF line endings that /bin/sh mis-parses.
+* text=auto eol=lf
