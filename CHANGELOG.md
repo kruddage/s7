@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.0](https://github.com/kruddage/s7/compare/v0.4.1...v0.5.0) (2026-07-23)
+
+
+### Features
+
+* add s7go, a cgo Go binding for the interpreter ([#25](https://github.com/kruddage/s7/issues/25)) ([78e5360](https://github.com/kruddage/s7/commit/78e53607574a9428c898ef7099e21af2eab7cc53))
+* **s7go:** let Scheme call Go functions via DefineFunc ([#27](https://github.com/kruddage/s7/issues/27)) ([33ad8a4](https://github.com/kruddage/s7/commit/33ad8a474a6eec1748d6c16fdbac5bd504f46ccf))
+
 ## [0.4.1](https://github.com/kruddage/s7/compare/v0.4.0...v0.4.1) (2026-07-22)
 
 
