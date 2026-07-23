@@ -56,6 +56,7 @@ type Scheme struct {
 	marker   C.s7_pointer // gensym distinguishing a caught error from a real value
 	evalWrap *C.char      // cached C string of the eval wrapper
 	srcName  *C.char      // cached C string "*s7go-src*"
+	cbIDs    []int64      // registry ids of Go callbacks defined on this instance
 	closed   bool
 }
 
@@ -104,6 +105,10 @@ func New() *Scheme {
 	s.marker = marker
 	C.s7_define_variable(sc, cMarkerName, marker)
 
+	// Register the Scheme->Go callback machinery (DefineFunc). Kept in
+	// callbacks.go so the cgo //export and its bridge stay self-contained.
+	s.initCallbacks()
+
 	runtime.SetFinalizer(s, (*Scheme).Close)
 	return s
 }
@@ -126,6 +131,18 @@ func (s *Scheme) Close() error {
 	}
 	s.closed = true
 	runtime.SetFinalizer(s, nil)
+
+	// Drop this instance's callbacks from the global registry so a long-lived
+	// process that creates and closes many interpreters does not leak them.
+	if len(s.cbIDs) > 0 {
+		cbMu.Lock()
+		for _, id := range s.cbIDs {
+			delete(cbReg, id)
+		}
+		cbMu.Unlock()
+		s.cbIDs = nil
+	}
+
 	C.s7_free(s.sc)
 	C.free(unsafe.Pointer(s.evalWrap))
 	C.free(unsafe.Pointer(s.srcName))

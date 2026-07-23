@@ -77,6 +77,10 @@ and call into Scheme from Go:
 sc := s7.New()
 defer sc.Close()
 n, _ := sc.EvalInt("(+ 40 2)")   // 42
+
+// Scheme can call back into Go, too:
+sc.DefineFunc("go-add", func(a []any) (any, error) { return a[0].(int64) + a[1].(int64), nil })
+sc.EvalInt("(go-add 2 3)")       // 5
 ```
 
 The module root sits at the repo root so the binding can compile the single checksummed
