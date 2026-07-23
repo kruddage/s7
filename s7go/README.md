@@ -53,9 +53,42 @@ func main() {
 | `(*Scheme) EvalFloat(code) (float64, error)` | Any number as a float64. |
 | `(*Scheme) EvalBool(code) (bool, error)` | Scheme truth value (only `#f` is false). |
 | `(*Scheme) EvalString(code) (string, error)` | Contents of a Scheme string result (no quotes). |
+| `(*Scheme) DefineFunc(name, fn) error` | Register a Go function callable from Scheme (see below). |
 | `(*Scheme) LoadFile(path) error` | `(load path)`, with errors returned rather than printed. |
 | `(*Scheme) Close() error` | Free the interpreter (idempotent; also finalized on GC). |
 | `Version() string` | Embedded s7 version, e.g. `10.8 (17-Apr-2024)`. |
+
+## Calling Go from Scheme
+
+`DefineFunc` installs a Go function that Scheme can call like any other
+procedure:
+
+```go
+sc.DefineFunc("go-add", func(args []any) (any, error) {
+	return args[0].(int64) + args[1].(int64), nil
+})
+
+n, _ := sc.EvalInt("(go-add 2 3)")   // 5
+```
+
+The callback signature is `func(args []any) (any, error)`. Values cross the
+boundary as these Go types:
+
+| Scheme | Go |
+|---|---|
+| integer | `int64` |
+| real / ratio | `float64` |
+| string | `string` |
+| boolean | `bool` |
+| symbol | `s7.Symbol` (distinct from `string`, both directions) |
+| list | `[]any` (elements converted recursively) |
+| anything else (arg) | its write form as a `string` |
+
+Return `nil` for Scheme `#<unspecified>`. Returning a Go value of an
+unsupported type is an error. Returning an `error` **raises a Scheme error** at
+the call site — catchable in Scheme with `catch`, and surfaced as a Go `error`
+if the call happened inside `Eval`. A callback never crashes the process, and
+the interpreter stays usable afterward.
 
 Errors raised inside Scheme — unbound variables, wrong-type arguments, explicit
 `(error ...)`, read errors — are caught and returned as a Go `error` carrying

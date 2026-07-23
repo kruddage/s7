@@ -31,3 +31,29 @@ func Example() {
 	// 55
 	// (1 4 9 16)
 }
+
+func ExampleScheme_DefineFunc() {
+	sc := s7.New()
+	defer sc.Close()
+
+	// Expose a Go function to Scheme. Arguments arrive as Go values; the
+	// returned value crosses back into Scheme.
+	sc.DefineFunc("go-sum", func(args []any) (any, error) {
+		var total int64
+		for _, a := range args {
+			total += a.(int64)
+		}
+		return total, nil
+	})
+
+	// Scheme calls it like any other procedure — here mapped over a list.
+	out, _ := sc.Eval("(go-sum 1 2 3 4 5)")
+	fmt.Println(out)
+
+	got, _ := sc.EvalInt("(apply go-sum (map (lambda (x) (* x x)) '(1 2 3)))")
+	fmt.Println(got)
+
+	// Output:
+	// 15
+	// 14
+}

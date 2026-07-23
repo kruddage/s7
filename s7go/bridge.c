@@ -21,3 +21,20 @@
  * ships.
  */
 #include "s7.c"
+
+/*
+ * Register the single dispatch entry point used by DefineFunc (see
+ * callbacks.go). s7goDispatch is a cgo //export'd Go function; a file that uses
+ * //export may only declare (not define) C functions in its preamble, so this
+ * definition lives here instead. It is called once per interpreter from
+ * initCallbacks. The Scheme wrapper DefineFunc installs calls
+ *   (s7go-dispatch <id> <arg-list>)
+ * so the two fixed arguments are the callback id and the list of caller args.
+ */
+extern s7_pointer s7goDispatch(s7_scheme *sc, s7_pointer args);
+
+void s7go_register_dispatch(s7_scheme *sc)
+{
+	s7_define_function(sc, "s7go-dispatch", s7goDispatch, 2, 0, false,
+			   "(s7go-dispatch id args) — s7go internal Go callback dispatch");
+}
