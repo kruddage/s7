@@ -67,6 +67,22 @@ Anything the s7 language supports works here — this is stock s7, just with a n
 door. For the language itself, the upstream
 [s7 documentation](https://ccrma.stanford.edu/software/snd/snd/s7.html) applies unchanged.
 
+## Embedding in Go
+
+[`s7go/`](s7go/) is a Go binding that links the same vendored interpreter through cgo — no
+prebuilt archive to download, no linker flags to wire up. `go get github.com/kruddage/s7/s7go`
+and call into Scheme from Go:
+
+```go
+sc := s7.New()
+defer sc.Close()
+n, _ := sc.EvalInt("(+ 40 2)")   // 42
+```
+
+The module root sits at the repo root so the binding can compile the single checksummed
+`third_party/s7.c` (a Go module only ships files at or below its `go.mod`); the importable
+package lives under `s7go/`. See [`s7go/README.md`](s7go/README.md) for the full API.
+
 ## Vendored s7
 
 `third_party/s7.c` and `third_party/s7.h` are third-party source, committed at the pinned

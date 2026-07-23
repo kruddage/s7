@@ -79,6 +79,34 @@ jobs:
           cc -O2 -Idist probe.c dist/libs7-linux-x86_64.a -lm -o probe
           test "$(./probe)" = 42
 
+  # Build and test the Go binding (s7go/), which links the same vendored
+  # third_party/s7.c through cgo. Like the libs job, this exists so the consumer
+  # can't rot: a change to s7.c, the vendored defines, or the bridge that breaks
+  # the cgo build or the wrapper's behaviour fails here, on the PR. The tests
+  # exercise eval, typed results, error capture, and file loading against the
+  # real interpreter, so it's usability that's checked, not just that it builds.
+  go:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install a C compiler
+        run: sudo apt-get update && sudo apt-get install -y gcc
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+
+      # CGO_ENABLED is the default on a native build, but set it explicitly so the
+      # binding's hard requirement is visible and a misconfigured runner fails
+      # loudly rather than silently skipping the cgo package.
+      - name: Vet and test
+        env:
+          CGO_ENABLED: 1
+        run: |
+          go vet ./s7go/
+          go test -race ./s7go/
+
   # Native Windows build, MinGW-w64 via MSYS2. This runs on windows-latest rather
   # than cross-compiling from ubuntu deliberately: a cross build proves only that
   # the code compiles and links, and the failures worth catching here are runtime
